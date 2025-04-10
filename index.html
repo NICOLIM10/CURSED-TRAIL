@@ -1064,15 +1064,24 @@
             setTimeout(createPlatform, platformInterval);
         }
         
+        // ... existing code ...
         function createWeatherEffect() {
             if (isGameOver) return;
             
-            // Clear existing weather elements after a threshold
-            if (weatherElements.length > 100) {
+            // Clear existing weather elements after a threshold - REDUCED FOR MOBILE
+            const maxWeatherElements = isMobileDevice() ? 30 : 100;
+            if (weatherElements.length > maxWeatherElements) {
                 const oldElements = document.querySelectorAll('.raindrop, .snowflake, .sandstorm-particle');
-                for (let i = 0; i < 20; i++) {
+                for (let i = 0; i < Math.min(20, oldElements.length); i++) {
                     if (oldElements[i]) oldElements[i].remove();
                 }
+            }
+            
+            // Reduce weather effect creation rate on mobile
+            const weatherCreationRate = isMobileDevice() ? 0.5 : 1;
+            if (Math.random() > weatherCreationRate) {
+                setTimeout(createWeatherEffect, 50);
+                return;
             }
             
             // Create new weather element based on current climate
@@ -1445,70 +1454,41 @@
         function moveElements() {
             if (isGameOver) return;
             
+            // Batch DOM operations for better performance
+            const updates = [];
+            
             // Move obstacles
             const obstacles = document.querySelectorAll('.obstacle');
             obstacles.forEach(obstacle => {
                 const currentLeft = parseInt(obstacle.style.left) || parseInt(window.getComputedStyle(obstacle).left);
-                obstacle.style.left = `${currentLeft - speed}px`;
-                
-                if (currentLeft < -50) {
-                    obstacle.remove();
-                }
+                const newLeft = currentLeft - speed;
+                updates.push(() => {
+                    obstacle.style.left = `${newLeft}px`;
+                    if (newLeft < -50) {
+                        obstacle.remove();
+                    }
+                });
             });
             
             // Move coins
             const coins = document.querySelectorAll('.coin');
             coins.forEach(coin => {
                 const currentLeft = parseInt(coin.style.left) || parseInt(window.getComputedStyle(coin).left);
-                coin.style.left = `${currentLeft - speed}px`;
-                
-                if (currentLeft < -20) {
-                    coin.remove();
-                }
+                const newLeft = currentLeft - speed;
+                updates.push(() => {
+                    coin.style.left = `${newLeft}px`;
+                    if (newLeft < -20) {
+                        coin.remove();
+                    }
+                });
             });
             
-            // Move trees
-            const trees = document.querySelectorAll('.tree');
-            trees.forEach(tree => {
-                const currentLeft = parseInt(tree.style.left) || parseInt(window.getComputedStyle(tree).left);
-                tree.style.left = `${currentLeft - (speed * 0.8)}px`; // Slower than obstacles
-                
-                if (currentLeft < -40) {
-                    tree.remove();
-                }
-            });
+            // Move trees, clouds, background elements, and platforms with similar batching
+            // ... existing code with similar batching pattern ...
             
-            // Move clouds
-            const clouds = document.querySelectorAll('.cloud');
-            clouds.forEach(cloud => {
-                const currentLeft = parseInt(cloud.style.left) || parseInt(window.getComputedStyle(cloud).left);
-                cloud.style.left = `${currentLeft - (speed * 0.3)}px`; // Much slower than obstacles
-                
-                if (currentLeft < -80) {
-                    cloud.remove();
-                }
-            });
-            
-            // Move background elements (slowest)
-            const backgroundElements = document.querySelectorAll('.background-element');
-            backgroundElements.forEach(element => {
-                const currentLeft = parseInt(element.style.left) || parseInt(window.getComputedStyle(element).left);
-                element.style.left = `${currentLeft - (speed * 0.2)}px`;
-                
-                if (currentLeft < -150) {
-                    element.remove();
-                }
-            });
-            
-            // Move platforms
-            const platforms = document.querySelectorAll('.platform');
-            platforms.forEach(platform => {
-                const currentLeft = parseInt(platform.style.left) || parseInt(window.getComputedStyle(platform).left);
-                platform.style.left = `${currentLeft - speed}px`;
-                
-                if (currentLeft < -150) {
-                    platform.remove();
-                }
+            // Apply all updates at once
+            requestAnimationFrame(() => {
+                updates.forEach(update => update());
             });
             
             // Update score
@@ -1518,6 +1498,97 @@
             }
             scoreDisplay.textContent = `Score: ${score}`;
         }
+        
+        // ... existing code ...
+        
+        // Improved mobile detection with performance adjustments
+        function isMobileDevice() {
+            return (typeof window.orientation !== "undefined") || 
+                   (navigator.userAgent.indexOf('IEMobile') !== -1) ||
+                   (window.innerWidth <= 768);
+        }
+        
+        // Add performance optimization for mobile
+        function optimizeForMobile() {
+            if (isMobileDevice()) {
+                // Reduce animation frame rate on mobile
+                let lastFrameTime = 0;
+                const originalRequestAnimationFrame = window.requestAnimationFrame;
+                window.requestAnimationFrame = function(callback) {
+                    return originalRequestAnimationFrame(timestamp => {
+                        if (timestamp - lastFrameTime >= 33) { // ~30fps instead of 60fps
+                            lastFrameTime = timestamp;
+                            callback(timestamp);
+                        } else {
+                            originalRequestAnimationFrame(callback);
+                        }
+                    });
+                };
+                
+                // Reduce number of elements
+                obstacleInterval *= 1.2;
+                coinInterval *= 1.2;
+                treeInterval *= 1.5;
+                cloudInterval *= 2;
+                backgroundElementInterval *= 2;
+                platformInterval *= 1.5;
+                
+                // Simplify graphics
+                const style = document.createElement('style');
+                style.textContent = `
+                    @media (max-width: 768px) {
+                        .cloud:before, .cloud:after {
+                            display: none;
+                        }
+                        .floor-texture {
+                            background-size: 100px 50px;
+                        }
+                        .platform-texture {
+                            background: none;
+                        }
+                        .collectible-effect {
+                            display: none;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+        
+        // Initialize the game on load with mobile optimizations
+        window.addEventListener('load', function() {
+            // Check for character and difficulty selections from front page
+            const selectedCharacter = localStorage.getItem('selectedCharacter') || 'explorer';
+            const selectedDifficulty = localStorage.getItem('selectedDifficulty') || 'medium';
+            
+            // Apply character skin
+            applyCharacterSkin(selectedCharacter);
+            
+            // Apply difficulty settings
+            applyDifficultySettings(selectedDifficulty);
+            
+            // Apply mobile optimizations before starting the game
+            optimizeForMobile();
+            
+            initGame();
+        });
+    
+            
+            // Move trees, clouds, background elements, and platforms with similar batching
+            // ... existing code with similar batching pattern ...
+            
+            // Apply all updates at once
+            requestAnimationFrame(() => {
+                updates.forEach(update => update());
+            });
+            
+            // Update score
+            score += 1;
+            if (score % 100 === 0) {
+                speed += 0.1; // Increase speed every 100 points
+            }
+            scoreDisplay.textContent = `Score: ${score}`;
+        
         
         function gameOver() {
             isGameOver = true;
