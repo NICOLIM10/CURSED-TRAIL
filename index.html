@@ -1,8 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Temple Runner</title>
     <style>
         body {
@@ -10,6 +8,7 @@
             overflow: hidden;
             font-family: Arial, sans-serif;
             background-color: #333;
+            touch-action: manipulation;
         }
         #game-container {
             position: relative;
@@ -333,6 +332,86 @@
         .platform-brick {
             background-color: #B22222;
         }
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            #controls-info {
+                font-size: 12px;
+                bottom: 10px;
+                right: 10px;
+                padding: 5px;
+            }
+            
+            #climate-select {
+                font-size: 12px;
+                padding: 5px 8px;
+            }
+            
+            #score-display, #high-score-display-top {
+                font-size: 16px;
+            }
+            
+            .obstacle {
+                transform: scale(1.2);
+            }
+            
+            #game-over {
+                width: 80%;
+                max-width: 300px;
+                padding: 15px;
+            }
+            
+            .main-menu .menu-container {
+                padding: 15px;
+            }
+            
+            .main-menu h1 {
+                font-size: 32px;
+            }
+            
+            .character-options, .difficulty-options, .climate-options {
+                gap: 10px;
+            }
+            
+            .character-preview {
+                width: 40px;
+                height: 60px;
+            }
+            
+            .start-button, .home-button, #restart-btn {
+                padding: 12px 24px;
+                font-size: 16px;
+            }
+        }
+        
+        /* Touch controls for mobile */
+        .mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: none;
+            z-index: 100;
+        }
+        
+        .mobile-control-btn {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            margin: 0 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: flex;
+            }
+        }
     </style>
 </head>
 <body>
@@ -360,6 +439,13 @@
             <p>Your score: <span id="final-score">0</span></p>
             <p class="high-score">High score: <span id="high-score-display">0</span></p>
             <button id="restart-btn">Play Again</button>
+        </div>
+        
+        <!-- Add mobile controls -->
+        <div class="mobile-controls">
+            <div class="mobile-control-btn" id="left-btn">←</div>
+            <div class="mobile-control-btn" id="jump-btn">↑</div>
+            <div class="mobile-control-btn" id="right-btn">→</div>
         </div>
     </div>
 
@@ -1600,9 +1686,106 @@
             }
         });
         
-        // Touch controls for mobile
+        // Update touch controls for mobile
         gameContainer.addEventListener('touchstart', function(event) {
             if (isGameOver) return;
+            
+            // Only handle as jump if not touching control buttons
+            const touch = event.touches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (!element.classList.contains('mobile-control-btn')) {
+                jump();
+                event.preventDefault();
+            }
+        });
+        
+        // Add mobile control button handlers
+        const leftBtn = document.getElementById('left-btn');
+        const jumpBtn = document.getElementById('jump-btn');
+        const rightBtn = document.getElementById('right-btn');
+        
+        // Touch event handlers for mobile buttons
+        if (leftBtn) {
+            leftBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                leftPressed = true;
+                moveIntervalLeft = setInterval(() => movePlayer('left'), 30);
+            });
+            
+            leftBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                leftPressed = false;
+                clearInterval(moveIntervalLeft);
+            });
+        }
+        
+        if (rightBtn) {
+            rightBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                rightPressed = true;
+                moveIntervalRight = setInterval(() => movePlayer('right'), 30);
+            });
+            
+            rightBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                rightPressed = false;
+                clearInterval(moveIntervalRight);
+            });
+        }
+        
+        if (jumpBtn) {
+            jumpBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                jump(true); // High jump
+            });
+        }
+        
+        // Add variables for continuous movement
+        let leftPressed = false;
+        let rightPressed = false;
+        let moveIntervalLeft;
+        let moveIntervalRight;
+        
+        // Prevent default touch behavior to avoid scrolling
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.id === 'game-container' || e.target.classList.contains('mobile-control-btn')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // Detect if device is mobile
+        function isMobileDevice() {
+            return (typeof window.orientation !== "undefined") || (navigator.userAgent.indexOf('IEMobile') !== -1);
+        }
+        
+        // Adjust game elements based on device
+        window.addEventListener('load', function() {
+            if (isMobileDevice()) {
+                // Adjust game parameters for mobile
+                speed = speed * 0.8; // Slightly slower for mobile
+                
+                // Hide keyboard controls info on mobile
+                const controlsInfo = document.getElementById('controls-info');
+                if (controlsInfo) {
+                    controlsInfo.innerHTML = 'Tap: Jump<br>Use buttons to move';
+                }
+            }
+            
+            // Rest of the load event handler...
+        });
+        
+        // Adjust for orientation changes
+        window.addEventListener('resize', function() {
+            // Pause game briefly during resize to prevent issues
+            if (!isGameOver) {
+                cancelAnimationFrame(animationFrameId);
+                setTimeout(() => {
+                    if (!isGameOver) {
+                        animationFrameId = requestAnimationFrame(gameLoop);
+                    }
+                }, 200);
+            }
             
             // Simple tap to jump
             jump();
